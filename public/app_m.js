@@ -12,11 +12,11 @@ let elevators = [
   { currentFloor: 0, previousFloor: 0, targetFloor: 0, animationId: null }
 ];
 
+let deliveredCount = 0;
 let startTime = new Date();
 let finishTime;
 
-let deliveredCount = 0;
-let timeNeeded = 0;
+let waitingPeople = new Set(mans.map(person => person.from));
 
 function drawFloors() {
   ctx.fillStyle = 'black';
@@ -30,8 +30,8 @@ function drawFloors() {
     ctx.stroke();
 
     ctx.beginPath();
-    ctx.moveTo(110, yPosition)
-    ctx.lineTo(110, yPosition+canvas.height)
+    ctx.moveTo(110, yPosition);
+    ctx.lineTo(110, yPosition + canvas.height);
     ctx.stroke();
   }
 }
@@ -49,11 +49,9 @@ function drawElevator() {
     const pos = 55 + (idx * 15);
     const elevatorYPos = canvas.height - (elevator.currentFloor + 1) * floorHeight + (floorHeight - elevatorHeight);
     drawElevatorBox(pos, elevatorYPos, elevatorWidth, elevatorHeight);
-    
-    // Display waiting text for specific floors
+
     for (let floor = 0; floor < totalFloors; floor++) {
-      const isWaiting = elevators.some(e => e.targetFloor === floor + 1);
-      if (isWaiting) {
+      if (waitingPeople.has(floor + 1)) {
         ctx.fillText('Waiting', 115, floor * floorHeight);
       }
     }
@@ -62,7 +60,7 @@ function drawElevator() {
 
 function animateElevator(idx, cb) {
   const elevator = elevators[idx];
-  const moveStep = 0.1; // Speed of elevator
+  const moveStep = 0.2;
 
   if (elevator.currentFloor < elevator.targetFloor) {
     elevator.currentFloor += moveStep;
@@ -85,20 +83,27 @@ function animateElevator(idx, cb) {
 
 function moveElevator(idx, man, cb) {
   const elevator = elevators[idx];
+  
   elevator.targetFloor = man.from - 1;
 
   animateElevator(idx, () => {
+    waitingPeople.delete(man.from);
+
     setTimeout(() => {
       elevator.targetFloor = man.to - 1;
       animateElevator(idx, () => {
         if (man.to - 1 === elevator.currentFloor) {
           updateDeliverCount(1);
         }
-        if (typeof cb === 'function') {
-          setTimeout(cb, 2000);
-        }
+
+        elevator.targetFloor = 0;
+        animateElevator(idx, () => {
+          if (typeof cb === 'function') {
+            setTimeout(cb, 2000);
+          }
+        });
       });
-    }, 2000);
+    }, 2000); 
   });
 }
 
@@ -117,11 +122,11 @@ function updateDeliverCount(v) {
 
 function runElevatorSimulation(elevatorIdx, row) {
   if (row === mans.length) return;
-  const man = getMan(row);
+  const person = mans[row];
 
-  moveElevator(elevatorIdx, man, () => {
-    const nextMan = getMan(row + 1);
-    if (nextMan !== null) {
+  moveElevator(elevatorIdx, person, () => {
+    const nextPerson = mans[row + 1];
+    if (nextPerson) {
       runElevatorSimulation(getNextElevator(elevatorIdx), row + 1);
     } else {
       finishTime = new Date();
@@ -131,11 +136,7 @@ function runElevatorSimulation(elevatorIdx, row) {
 }
 
 function getNextElevator(idx) {
-  return idx === elevators.length - 1 ? 0 : idx + 1;
-}
-
-function getMan(idx) {
-  return idx === mans.length ? null : mans[idx];
+  return (idx + 1) % elevators.length;
 }
 
 runElevatorSimulation(0, 0);
