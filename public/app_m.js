@@ -1,8 +1,5 @@
 const canvas = document.getElementById('elevatorCanvas');
 const ctx = canvas.getContext('2d');
-const elevatorInput = document.getElementById('elevatorInput');
-const floorInput = document.getElementById('floorInput');
-const requestButton = document.getElementById('requestButton');
 
 const totalFloors = 50;
 const floorHeight = 14; 
@@ -10,27 +7,9 @@ const elevatorWidth = 10;
 const elevatorHeight = 13;
 
 let elevators = [
-  {
-    currentFloor: 0,
-    previousFloor: 0,
-    targetFloor: 0,
-    animationId: null,
-    state: 0,
-  },
-  {
-    currentFloor: 0,
-    previousFloor: 0,
-    targetFloor: 0,
-    animationId: null,
-    state: 0,
-  },
-  {
-    currentFloor: 0,
-    previousFloor: 0,
-    targetFloor: 0,
-    animationId: null,
-    state: 0,
-  }
+  { currentFloor: 0, previousFloor: 0, targetFloor: 0, animationId: null },
+  { currentFloor: 0, previousFloor: 0, targetFloor: 0, animationId: null },
+  { currentFloor: 0, previousFloor: 0, targetFloor: 0, animationId: null }
 ];
 
 let startTime = new Date();
@@ -39,11 +18,7 @@ let finishTime;
 let deliveredCount = 0;
 let timeNeeded = 0;
 
-updateDeliverCount();
-
-function drawElevator() {
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
-  // Draw floors and floor numbers
+function drawFloors() {
   ctx.fillStyle = 'black';
   for (let i = 0; i < totalFloors; i++) {
     const yPosition = canvas.height - (i + 1) * floorHeight;
@@ -59,20 +34,6 @@ function drawElevator() {
     ctx.lineTo(110, yPosition+canvas.height)
     ctx.stroke();
   }
-
-  let gapBetween = 0;
-
-  for (let idx = 0; idx < elevators.length; idx++) {
-    if (idx > 0) {
-      gapBetween = idx * 15;
-    }
-    const pos = 55 + gapBetween;
-    const obj = elevators[idx]
-    drawElevatorBox(pos,canvas.height - (obj.currentFloor + 1) * floorHeight + (floorHeight - elevatorHeight), elevatorWidth, elevatorHeight)
-  
-    ctx.fillText('Waiting', 115, (obj.targetFloor - 1) * floorHeight);
-    ctx.stroke()
-  }
 }
 
 function drawElevatorBox(xPos, yPos, wVal, hVal) {
@@ -80,59 +41,65 @@ function drawElevatorBox(xPos, yPos, wVal, hVal) {
   ctx.fillRect(xPos, yPos, wVal, hVal);
 }
 
+function drawElevator() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  drawFloors();
+
+  elevators.forEach((elevator, idx) => {
+    const pos = 55 + (idx * 15);
+    const elevatorYPos = canvas.height - (elevator.currentFloor + 1) * floorHeight + (floorHeight - elevatorHeight);
+    drawElevatorBox(pos, elevatorYPos, elevatorWidth, elevatorHeight);
+    
+    // Display waiting text for specific floors
+    for (let floor = 0; floor < totalFloors; floor++) {
+      const isWaiting = elevators.some(e => e.targetFloor === floor + 1);
+      if (isWaiting) {
+        ctx.fillText('Waiting', 115, floor * floorHeight);
+      }
+    }
+  });
+}
+
 function animateElevator(idx, cb) {
-  const obj = elevators[idx];
+  const elevator = elevators[idx];
+  const moveStep = 0.1; // Speed of elevator
 
-  obj.state = 1;
-
-  if (obj.currentFloor < obj.targetFloor) {
-    let gap = obj.targetFloor - obj.currentFloor;
-    let inLinear = parseInt(obj.targetFloor / 5)
-    if (gap < 5) {
-      obj.currentFloor += 0.1;
-    } else if (obj.currentFloor === 0 && obj.currentFloor <= inLinear) {
-      obj.currentFloor += 0.1
-    } else if (obj.currentFloor > 0 && (obj.currentFloor - 5) < inLinear) {
-      obj.currentFloor += 0.1;
-    } else {
-      obj.currentFloor += 0.2;
-    }
-    if (obj.currentFloor > obj.targetFloor) obj.currentFloor = obj.targetFloor;
-  } else if (obj.currentFloor > obj.targetFloor) {
-    let gap = (obj.currentFloor - obj.targetFloor)
-    if (obj.previousFloor > 0) {
-      let inLinear = parseInt(obj.previousFloor/ 5)
-      if (gap < 5) {
-        obj.currentFloor -= 0.1;
-      } else if (obj.currentFloor > parseInt(inLinear * 5)) {
-        obj.currentFloor -= 0.1;
-      } else {
-        obj.currentFloor -= 0.2;
-      }
-    } else {
-      if (gap < 5) {
-        obj.currentFloor -= 0.1;
-      } else {
-        obj.currentFloor -= 0.2;
-      }
-    }
-
-    if (obj.currentFloor < obj.targetFloor) {
-       obj.currentFloor = obj.targetFloor;
-    }
+  if (elevator.currentFloor < elevator.targetFloor) {
+    elevator.currentFloor += moveStep;
+    if (elevator.currentFloor > elevator.targetFloor) elevator.currentFloor = elevator.targetFloor;
+  } else if (elevator.currentFloor > elevator.targetFloor) {
+    elevator.currentFloor -= moveStep;
+    if (elevator.currentFloor < elevator.targetFloor) elevator.currentFloor = elevator.targetFloor;
   }
-  
+
   drawElevator();
 
-  if (obj.currentFloor !== obj.targetFloor) {
-    obj.animationId = requestAnimationFrame(eval('animateElevator'+(idx+1)));
+  if (elevator.currentFloor !== elevator.targetFloor) {
+    elevator.animationId = requestAnimationFrame(() => animateElevator(idx, cb));
   } else {
-    obj.previousFloor = obj.currentFloor;
-    cancelAnimationFrame(obj.animationId);
-
-    obj.state = 0;
-    if (typeof cb === 'function') cb(obj);
+    elevator.previousFloor = elevator.currentFloor;
+    cancelAnimationFrame(elevator.animationId);
+    if (typeof cb === 'function') cb(elevator);
   }
+}
+
+function moveElevator(idx, man, cb) {
+  const elevator = elevators[idx];
+  elevator.targetFloor = man.from - 1;
+
+  animateElevator(idx, () => {
+    setTimeout(() => {
+      elevator.targetFloor = man.to - 1;
+      animateElevator(idx, () => {
+        if (man.to - 1 === elevator.currentFloor) {
+          updateDeliverCount(1);
+        }
+        if (typeof cb === 'function') {
+          setTimeout(cb, 2000);
+        }
+      });
+    }, 2000);
+  });
 }
 
 function updateDeliverCount(v) {
@@ -140,7 +107,6 @@ function updateDeliverCount(v) {
     deliveredCount += v;
   }
   document.getElementById("startTime").innerHTML = startTime.toLocaleString();
-  
   if (finishTime) {
     document.getElementById("finishTime").innerHTML = finishTime.toLocaleString();
     document.getElementById("gapTime").innerHTML = getDateTimeSince(startTime);
@@ -149,143 +115,27 @@ function updateDeliverCount(v) {
   document.getElementById("counter").innerHTML = deliveredCount;
 }
 
-drawElevator(0, 0);
-drawElevator(1, 0);
-drawElevator(2, 0);
+function runElevatorSimulation(elevatorIdx, row) {
+  if (row === mans.length) return;
+  const man = getMan(row);
 
-let elvParams1 = [];
-function setElevatorParams1() {
-  elvParams1 = arguments;
-}
-function getElevatorParams1(){
-  return elvParams1;
-}
-function clearElevatorParams1() {
-  elvParams1 = [];
-}
-
-let elvParams2 = [];
-function setElevatorParams2() {
-  elvParams2 = arguments;
-}
-function getElevatorParams2(){
-  return elvParams2;
-}
-function clearElevatorParams2() {
-  elvParams2 = [];
-}
-
-let elvParams3 = [];
-function setElevatorParams3() {
-  elvParams3 = arguments;
-}
-function getElevatorParams3(){
-  return elvParams3;
-}
-function clearElevatorParams3() {
-  elvParams3 = [];
-}
-
-function animateElevator1(){
-  animateElevator.apply(null, [0, ...getElevatorParams1()])
-}
-function animateElevator2(){
-  animateElevator.apply(null, [1, ...getElevatorParams2()])
-}
-function animateElevator3(){
-  animateElevator.apply(null, [2, ...getElevatorParams3()])
-}
-
-function mapSetIdxToElevator(idx, params) {
-  if (idx === 2) {
-    setElevatorParams3.apply(null, params)
-  }
-
-  if (idx === 1) {
-    setElevatorParams2.apply(null, params)
-  }
-
-  if (idx === 0) {
-    setElevatorParams1.apply(null, params)
-  }
-}
-
-function mapClearParamsIdxElevator(idx) {
-  if (idx === 2) {
-    clearElevatorParams3()
-  }
-
-  if (idx === 1) {
-    clearElevatorParams2()
-  }
-
-  if (idx === 0) {
-    clearElevatorParams1()
-  }
-}
-
-function mapCallIdxToElevator(idx) {
-  if (idx === 2) {
-    animateElevator3()
-  }
-
-  if (idx === 1) {
-    animateElevator2()
-  }
-
-  if (idx === 0) {
-    animateElevator1()
-  }
-}
-
-function go(idx, man, cb) {
-  const elv = elevators[idx];
-    elv.targetFloor = man.from - 1;
-    mapSetIdxToElevator(idx, [function(elv) {
-
-      setTimeout(function(){
-        elv.targetFloor = man.to - 1;
-        mapClearParamsIdxElevator(idx);
-        mapSetIdxToElevator(idx, [function(el){
-          if ((man.to - 1) == el.currentFloor) {
-            updateDeliverCount(1)
-          }
-
-          // next
-          if (typeof cb === 'function') {
-            setTimeout(cb, 2000);
-          }
-        }])
-        mapCallIdxToElevator(idx);
-      }, 2000)
-    }]);
-
-    mapCallIdxToElevator(idx);
+  moveElevator(elevatorIdx, man, () => {
+    const nextMan = getMan(row + 1);
+    if (nextMan !== null) {
+      runElevatorSimulation(getNextElevator(elevatorIdx), row + 1);
+    } else {
+      finishTime = new Date();
+      updateDeliverCount();
+    }
+  });
 }
 
 function getNextElevator(idx) {
-  if (idx === 2) return 0;
-  return idx + 1;
+  return idx === elevators.length - 1 ? 0 : idx + 1;
 }
 
 function getMan(idx) {
-  if (idx === mans.length) return null;
-  return mans[idx];
+  return idx === mans.length ? null : mans[idx];
 }
 
-function run(elvIdx, row) {
-  if (row == mans.length) return;
-  const m = getMan(row);
-  go(elvIdx, m, function(){
-    const m2 = getMan(row+1);
-    if (m2 != null) {
-      return run(getNextElevator(elvIdx), row+1)
-    } 
-
-    finishTime = new Date();
-    updateDeliverCount();
-  })
-}
-
-run(0, 0)
-
+runElevatorSimulation(0, 0);
